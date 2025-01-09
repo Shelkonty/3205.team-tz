@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        input[type="text"], input[type="datetime-local"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+<h1>URL Shortener</h1>
+<div class="form-group">
+    <label for="originalUrl">Original URL:</label>
+    <input type="text" id="originalUrl" placeholder="https://example.com" required>
+</div>
+<div class="form-group">
+    <label for="alias">Custom Alias (optional):</label>
+    <input type="text" id="alias" placeholder="my-custom-alias">
+</div>
+<div class="form-group">
+    <label for="expiresAt">Expires At (optional):</label>
+    <input type="datetime-local" id="expiresAt">
+</div>
+<button onclick="shortenUrl()">Shorten URL</button>
+<div id="result"></div>
+
+<script>
+    async function shortenUrl() {
+        const originalUrl = document.getElementById('originalUrl').value;
+        const alias = document.getElementById('alias').value;
+        const expiresAt = document.getElementById('expiresAt').value;
+        const resultDiv = document.getElementById('result');
+
+        if (!originalUrl) {
+            resultDiv.innerHTML = '<p style="color: red">Please enter a URL</p>';
+            return;
+        }
+
+        try {
+            const response = await fetch('/shorten', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    originalUrl,
+                    alias: alias || undefined,
+                    expiresAt: expiresAt || undefined
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                resultDiv.innerHTML = `
+                        <p>Short URL: <a href="${data.shortUrl}" target="_blank">${data.shortUrl}</a></p>
+                        <p>
+                            <button onclick="getUrlInfo('${data.shortUrl.split('/').pop()}')">Get Info</button>
+                            <button onclick="getAnalytics('${data.shortUrl.split('/').pop()}')">Get Analytics</button>
+                            <button onclick="deleteUrl('${data.shortUrl.split('/').pop()}')" style="background-color: #dc3545;">Delete</button>
+                        </p>
+                    `;
+            } else {
+                resultDiv.innerHTML = `<p style="color: red">Error: ${data.error || 'Something went wrong'}</p>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = '<p style="color: red">Error: Could not connect to server</p>';
+        }
+    }
+
+    async function getUrlInfo(shortUrl) {
+        const resultDiv = document.getElementById('result');
+        try {
+            const response = await fetch(`/info/${shortUrl}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                resultDiv.innerHTML += `
+                        <h3>URL Info:</h3>
+                        <p>Original URL: ${data.originalUrl}</p>
+                        <p>Created At: ${new Date(data.createdAt).toLocaleString()}</p>
+                        <p>Click Count: ${data.clickCount}</p>
+                        ${data.expiresAt ? `<p>Expires At: ${new Date(data.expiresAt).toLocaleString()}</p>` : ''}
+                    `;
+            } else {
+                resultDiv.innerHTML += `<p style="color: red">Error: ${data.error}</p>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML += '<p style="color: red">Error: Could not fetch URL info</p>';
+        }
+    }
+
+    async function getAnalytics(shortUrl) {
+        const resultDiv = document.getElementById('result');
+        try {
+            const response = await fetch(`/analytics/${shortUrl}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                resultDiv.innerHTML += `
+                        <h3>Analytics:</h3>
+                        <p>Click Count: ${data.clickCount}</p>
+                        <p>Recent IPs: ${data.recentIps.join(', ') || 'No clicks yet'}</p>
+                    `;
+            } else {
+                resultDiv.innerHTML += `<p style="color: red">Error: ${data.error}</p>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML += '<p style="color: red">Error: Could not fetch analytics</p>';
+        }
+    }
+
+    async function deleteUrl(shortUrl) {
+        const resultDiv = document.getElementById('result');
+        try {
+            const response = await fetch(`/delete/${shortUrl}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                resultDiv.innerHTML = `<p style="color: green">${data.message}</p>`;
+            } else {
+                resultDiv.innerHTML += `<p style="color: red">Error: ${data.error}</p>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML += '<p style="color: red">Error: Could not delete URL</p>';
+        }
+    }
+</script>
+</body>
+</html>
